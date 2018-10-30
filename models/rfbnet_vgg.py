@@ -6,8 +6,16 @@ from torchvision.models.vgg import vgg16
 from models import BasicConv, RFB3, RFB4, SSDDetectionHead
 
 
-class RFBNetVGG(nn.Module):
+def get_num_anchors_list(aspect_ratios=((2, 3), (2, 3), (2, 3), (2, 3), (2, 3), (2,), (2,))):
+    return [(2 * len(a) + 2) for a in aspect_ratios]
 
+
+class RFBNetVGG(nn.Module):
+    """
+    Receptive-Field Block Network
+
+    input image should be D x D, RGB
+    """
     def __init__(self, num_classes, num_anchors_list=(6, 6, 6, 6, 6, 4, 4)):
         super(RFBNetVGG, self).__init__()
         self.num_classes = num_classes
@@ -31,17 +39,17 @@ class RFBNetVGG(nn.Module):
         in_planes_list = (512, ) + self.rfb_pyramid.out_planes_list
         self.detection_head = SSDDetectionHead(in_planes_list, num_anchors_list, num_classes)
 
-    def forward(self, x):
-
+    def forward_encoder(self, x):
         detection_inputs = []
-
         x = self.blocks1234(x)
         detection_inputs.append(self.rfb4(x))
-
         x = self.mp_block5(x)
         x = self.block67(x)
-
         detection_inputs += self.rfb_pyramid(x)
+        return detection_inputs
+
+    def forward(self, x):
+        detection_inputs = self.forward_encoder(x)
         return self.detection_head(detection_inputs)
 
 
